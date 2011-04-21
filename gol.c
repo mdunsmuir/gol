@@ -1,8 +1,9 @@
+//#include "SDL.h"
 #include <stdlib.h>
 #include <stdio.h>
 
-#define ARRWIDTH 22
-#define ARRHEIGHT 22
+#define ARRWIDTH 30
+#define ARRHEIGHT 30
 
 void ascii_display(unsigned char *arr,
 		   int xpos, int ypos,
@@ -21,10 +22,32 @@ typedef enum _gol_flipflop{
 int main(int argc, char **argv)
 {
   int i, j, ni, nj, xpos, ypos, ystart;
-  unsigned char flip[ARRWIDTH * ARRHEIGHT], flop[ARRWIDTH * ARRHEIGHT], count;
+  register int c;
+  unsigned char flip[ARRWIDTH * ARRHEIGHT], flop[ARRWIDTH * ARRHEIGHT],
+    count[ARRWIDTH * ARRHEIGHT];
   unsigned char *cur, *evo;
   gol_state state = gol_state_run;
   gol_flipflop ff = gol_flip;
+
+  FILE *file;
+  int fx, fy;
+
+  //  SDL_Surface *screen = NULL;
+
+  struct timespec wait;
+  wait.tv_sec = 0;
+  wait.tv_nsec = 200000000;
+
+  if(argc != 2){
+    puts("usage -- gol <board file>");
+    return 0;
+  }
+
+  file = fopen(argv[1], "r");
+  if(file == NULL){
+    printf("error -- failed to open file %s", argv[1]);
+    return 0;
+  }
 
   /*
     fill array with zeroes
@@ -32,9 +55,15 @@ int main(int argc, char **argv)
   for(i = 0; i < ARRWIDTH * ARRHEIGHT; i++)
     flip[i] = 0;
 
-  flip[113] = 1;
-  flip[114] = 1;
-  flip[115] = 1;
+  while(fscanf(file, "%i %i\n", &fx, &fy) == 2){
+    if(fx < 0 || fx >= ARRWIDTH || fy < 0 || fy >= ARRHEIGHT){
+      puts("warning -- you specified a point (%i, %i) outside the array, skipping it");
+      continue;
+    }
+    flip[fx + fy * ARRWIDTH] = 1;
+  }
+
+  fclose(file);
 
   /*
     main loop
@@ -49,38 +78,46 @@ int main(int argc, char **argv)
       evo = flip;
       ff = gol_flip;
     }
+    
+    for(c = 0; c < ARRWIDTH * ARRHEIGHT; c++)
+      count[c] = 0;
+
     ascii_display(cur, 0, 0, ARRWIDTH, ARRHEIGHT);
     for(i = 0; i < ARRWIDTH; i++){
       for(j = 0; j < ARRHEIGHT; j++){
-	count = 0;
-	for(ni = 0; ni < 3; ni++){
-	  xpos = i - 1 + ni;
-	  if(xpos < 0) continue;
-	  if(xpos >= ARRWIDTH) break;
-	  for(nj = 0; nj < 3; nj++){
-	    ypos = j - 1 + nj;
-	    if(ypos < 0 || (ypos == j && xpos == i)) continue;
-	    else if(ypos >= ARRHEIGHT) break;
-	    count += cur[xpos + ypos * ARRWIDTH];
+	
+	if(cur[i + j * ARRWIDTH]){ // add count to neighbors
+	  for(ni = 0; ni < 3; ni++){
+	    xpos = i - 1 + ni;
+	    if(xpos < 0) continue;
+	    else if(xpos >= ARRWIDTH) break;
+	    for(nj = 0; nj < 3; nj++){
+	      ypos = j - 1 + nj;
+	      if(ypos < 0 || (ypos == j && xpos == i)) continue;
+	      else if(ypos >= ARRHEIGHT) break;
+	      count[xpos + ypos * ARRWIDTH]++;
+	    }
 	  }
-	}
-	//	  if(count > 0) printf("%i, %i, %i\n", i, j, count);
-	if(cur[i + j * ARRWIDTH]){ // live cell
-	  if(count < 2)
-	    evo[i + j * ARRWIDTH] = 0;
-	  else if(count <= 3)
-	    evo[i + j * ARRWIDTH] = 1;
-	  else
-	    evo[i + j * ARRWIDTH] = 0;
-	} else{ //dead cell
-	  if(count == 3)
-	    evo[i + j * ARRWIDTH] = 1;
-	  else
-	    evo[i + j * ARRWIDTH] = 0;
 	}
       }
     }
-    sleep(1);
+    //	  if(count > 0) printf("%i, %i, %i\n", i, j, count);
+    for(i = 0; i < ARRWIDTH * ARRHEIGHT; i++){
+      if(cur[i]){ // live cell
+	if(count[i] < 2)
+	  evo[i] = 0;
+	else if(count[i] <= 3)
+	  evo[i] = 1;
+	else
+	  evo[i] = 0;
+      } else{ //dead cell
+	if(count[i] == 3)
+	  evo[i] = 1;
+	else
+	  evo[i] = 0;
+      }
+    }
+    nanosleep(&wait, NULL);
   }
 
   return 0;
