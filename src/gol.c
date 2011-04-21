@@ -215,7 +215,7 @@ int main(int argc, char **argv)
   }
   SDL_WM_SetCaption("life!", NULL);
 
-  black = SDL_MapRGB(screen->format, 0, 0, 0);
+  black = SDL_MapRGB(screen->format, 10, 10, 10);
   white = SDL_MapRGB(screen->format, 255, 255, 255);
 
   /*
