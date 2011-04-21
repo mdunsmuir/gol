@@ -19,5 +19,4 @@ lib :
 	mkdir lib
 
 clean :
-	rm gol
-	rm lib/*.a lib/*.o
+	rm -r gol lib/ *~ */*~
