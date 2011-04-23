@@ -166,8 +166,9 @@ int main(int argc, char **argv)
   /*
     fill array with zeroes
   */
-  for(i = 0; i < arrwidth * arrheight; i++)
+  for(i = 0; i < arrwidth * arrheight; i++){
     flip[i] = 0;
+  }
 
   if(filename != NULL){
     file = fopen(filename, "r");
@@ -394,23 +395,66 @@ int main(int argc, char **argv)
   return 0;
 }
 
+
 void sdl_display(unsigned char *arr,
 		 int xpos, int ypos,
 		 int width, int height)
 {
   int i, j;
+  Uint8 *p;
   SDL_Rect dst;
   SDL_FillRect(screen, NULL, black);
-  for(j = ypos; j < height; j++){
-    if(j >= arrheight) break;
-    for(i = xpos; i < width; i++){
-      if(i >= arrwidth) break;
-      else if(arr[i + j * arrwidth]){
-	dst.x = i * cellsidepx;
-	dst.y = j * cellsidepx;
-	dst.w = cellsidepx;
-	dst.h = cellsidepx;
-	SDL_FillRect(screen, &dst, white);
+
+  if(cellsidepx == 1){
+    //    puts("yo!");
+    if(SDL_MUSTLOCK(screen))
+      SDL_LockSurface(screen);
+    
+    for(j = ypos; j < height; j++){
+      if(j >= arrheight) break;
+      for(i = xpos; i < width; i++){
+	if(i >= arrwidth) break;
+	else if(arr[i + j * arrwidth]){
+	  p = (Uint8 *)screen->pixels + j * screen->pitch + i * screen->format->BytesPerPixel;
+	  switch(screen->format->BytesPerPixel) {
+	  case 1:
+	    *p = white;
+	    break;	    
+	  case 2:
+	    *(Uint16 *)p = white;
+	    break;	    
+	  case 3:
+	    if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
+	      p[0] = (white >> 16) & 0xff;
+	      p[1] = (white >> 8) & 0xff;
+	      p[2] = white & 0xff;
+	    } else {
+	      p[0] = white & 0xff;
+	      p[1] = (white >> 8) & 0xff;
+	      p[2] = (white >> 16) & 0xff;
+	    }
+	    break;	    
+	  case 4:
+	    *(Uint32 *)p = white;
+	    break;
+	  }
+	}
+      }
+    }
+    if(SDL_MUSTLOCK(screen))
+      SDL_UnlockSurface(screen);
+  } else{ 
+    for(j = ypos; j < height; j++){
+      if(j >= arrheight) break;
+      for(i = xpos; i < width; i++){
+	if(i >= arrwidth) break;
+	else if(arr[i + j * arrwidth]){
+	  dst.x = i * cellsidepx;
+	  dst.y = j * cellsidepx;
+	  dst.w = cellsidepx;
+	  dst.h = cellsidepx;
+	  SDL_FillRect(screen, &dst, white);
+	}
       }
     }
   }
