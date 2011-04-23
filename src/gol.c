@@ -18,7 +18,7 @@
 #define WINDOW_G 100
 #define WINDOW_B 255
 
-#define CELLSIDEPX 16
+#define CELLSIDEPX 8
 
 #define WAIT 75
 #define MOVE 10
@@ -27,6 +27,7 @@
 
 Uint32 black;
 Uint32 white;
+Uint32 red;
 
 unsigned int mainwindowwidth = MAINWINDOWWIDTH;
 unsigned int mainwindowheight = MAINWINDOWHEIGHT;
@@ -195,6 +196,7 @@ int main(int argc, char **argv)
 
   black = SDL_MapRGB(screen->format, 10, 10, 10);
   white = SDL_MapRGB(screen->format, 255, 255, 255);
+  red = SDL_MapRGB(screen->format, 150, 10, 10);
 
   /*
     main loop
@@ -228,30 +230,30 @@ int main(int argc, char **argv)
     */
     if(keystate[SDLK_RIGHT]){
       if(MOVE / cellsidepx > 0)
-	disp_x += MOVE / cellsidepx;
+	disp_x += MOVE / cellsidepx * WAIT / 20;
       else
-	disp_x += 1;
+	disp_x += 1 * WAIT / 20;
     }
     
     if(keystate[SDLK_LEFT]){
       if(MOVE / cellsidepx > 0)
-	disp_x -= MOVE / cellsidepx;
+	disp_x -= MOVE / cellsidepx * WAIT / 20;
       else
-	disp_x -= 1;
+	disp_x -= 1 * WAIT / 20;
     }
 
     if(keystate[SDLK_UP]){
       if(MOVE / cellsidepx > 0)
-	disp_y -= MOVE / cellsidepx;
+	disp_y -= MOVE / cellsidepx * WAIT / 20;
       else
-	disp_y -= 1;
+	disp_y -= 1 * WAIT / 20;
     }
     
     if(keystate[SDLK_DOWN]){
       if(MOVE / cellsidepx > 0)
-	disp_y += MOVE / cellsidepx;
+	disp_y += MOVE / cellsidepx * WAIT / 20;
       else
-	disp_y += 1;
+	disp_y += 1 * WAIT / 20;
     }
 
     while(SDL_PollEvent(&myevent)){
@@ -497,6 +499,30 @@ void sdl_display(unsigned char *arr,
 	    *(Uint32 *)p = white;
 	    break;
 	  }
+	} else if(xt[i] == 0 || yt == 0){
+	  p = (Uint8 *)screen->pixels + j * screen->pitch + i * screen->format->BytesPerPixel;
+	  switch(screen->format->BytesPerPixel) {
+	  case 1:
+	    *p = red;
+	    break;	    
+	  case 2:
+	    *(Uint16 *)p = red;
+	    break;	    
+	  case 3:
+	    if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
+	      p[0] = (red >> 16) & 0xff;
+	      p[1] = (red >> 8) & 0xff;
+	      p[2] = red & 0xff;
+	    } else {
+	      p[0] = red & 0xff;
+	      p[1] = (red >> 8) & 0xff;
+	      p[2] = (red >> 16) & 0xff;
+	    }
+	    break;	    
+	  case 4:
+	    *(Uint32 *)p = red;
+	    break;
+	  }
 	}
       }
     }
@@ -516,6 +542,12 @@ void sdl_display(unsigned char *arr,
 	  dst.w = cellsidepx;
 	  dst.h = cellsidepx;
 	  SDL_FillRect(screen, &dst, white);
+	} else if(xt[i] == 0 || yt == 0){
+	  dst.x = i * cellsidepx;
+	  dst.y = j * cellsidepx;
+	  dst.w = cellsidepx;
+	  dst.h = cellsidepx;
+	  SDL_FillRect(screen, &dst, red);
 	}
       }
     }
