@@ -21,6 +21,7 @@
 #define CELLSIDEPX 16
 
 #define WAIT 75
+#define MOVE 10
 
 #define LETTERS_SPRITEFILE "graphics/8letters.bmp"
 
@@ -36,8 +37,9 @@ unsigned int wait = WAIT;
 
 SDL_Surface *screen = NULL;
 sprut_spritelib *letters;
+int xoff = 0, yoff = 0;
 long int generation = 0;
-char strbuf[32];
+char strbuf[128];
 
 typedef enum _gol_state{
   gol_state_run,
@@ -53,9 +55,9 @@ typedef enum _gol_flipflop{
   gol_flop
 } gol_flipflop;
 
+int load_gol(char *filename, unsigned char *arr);
 void sdl_display(unsigned char *arr,
-		 int xpos, int ypos,
-		 int width, int height);
+		 int xpos, int ypos);
 void ascii_display(unsigned char *arr,
 		   int xpos, int ypos,
 		   int width, int height);
@@ -67,18 +69,18 @@ int delay();
 
 int main(int argc, char **argv)
 {
-  int i, j, ni, nj, xpos, ypos, xoff = 0, yoff = 0, loop = 0;
+  int click_x, click_y, i, j, ni, nj, xpos, ypos, disp_x = 0, disp_y = 0, loop = 0;
   register int c;
   gol_flipflop ff = gol_flop;
 
-  FILE *file;
-  int fx, fy;
-
   SDL_Thread *waitthread;
   SDL_Event myevent;
+  Uint8 *keystate;
   void *voidptr = NULL;
 
-  char *usage = "usage: gol [-l] [-t <wait time milliseconds>] [-p <cell side pixels>] [-d <width> <height>] [-w <main window width> <main window height>] [-o <x offset> <y offset>] [filename]\n       \n       the -l option enables the toroidal array wrapping\n\n       commands:\n         q: quit\n         p: pause\n         r: run\n         n: step (while paused)\n         c: clear (while paused)\n         s: save to \"saved.gol\" (while paused)\n         l: load from same (while paused)\n         ";
+  FILE *file;
+
+  char *usage = "usage: gol [-l] [-t <wait time milliseconds>] [-p <cell side pixels>] [-d <width> <height>] [-w <main window width> <main window height>] [-o <x offset> <y offset>] [filename]\n       \n       the -l option enables the toroidal array wrapping\n\n       commands:\n         q: quit\n         p: pause/resume\n         r: reset\n         n: step (while paused)\n         c: clear (while paused)\n         s: save to \"saved.gol\" (while paused)\n         l: load from same (while paused)\n         ";
   char *filename = NULL;
 
   unsigned int argcount = 1;
@@ -163,32 +165,7 @@ int main(int argc, char **argv)
     return 0;
   }
 
-  /*
-    fill array with zeroes
-  */
-  for(i = 0; i < arrwidth * arrheight; i++){
-    flip[i] = 0;
-  }
-
-  if(filename != NULL){
-    file = fopen(filename, "r");
-    if(file == NULL){
-      printf("error -- failed to open file %s\n", argv[1]);
-      return 0;
-    }
-
-    while(fscanf(file, "%i %i\n", &fx, &fy) == 2){
-      fx += xoff;
-      fy += yoff;
-      if(fx < 0 || fx >= arrwidth || fy < 0 || fy >= arrheight){
-	printf("warning -- you specified a point (%i, %i) outside the array, skipping it\n", fx, fy);
-	continue;
-      }
-      flip[fx + fy * arrwidth] = 1;
-    }
-    
-    fclose(file);
-  } 
+  load_gol(filename, flip);
 
   /*
     Initialize SDL functions... just video for now
@@ -241,9 +218,41 @@ int main(int argc, char **argv)
     if(state == gol_state_bump) 
       state = gol_state_pause;
 
-    sdl_display(cur, 0, 0, arrwidth, arrheight);
+    sdl_display(cur, disp_x, disp_y);
 
     SDL_PumpEvents();
+    keystate = SDL_GetKeyState(NULL);
+    
+    /*
+      Get movement keys
+    */
+    if(keystate[SDLK_RIGHT]){
+      if(MOVE / cellsidepx > 0)
+	disp_x += MOVE / cellsidepx;
+      else
+	disp_x += 1;
+    }
+    
+    if(keystate[SDLK_LEFT]){
+      if(MOVE / cellsidepx > 0)
+	disp_x -= MOVE / cellsidepx;
+      else
+	disp_x -= 1;
+    }
+
+    if(keystate[SDLK_UP]){
+      if(MOVE / cellsidepx > 0)
+	disp_y -= MOVE / cellsidepx;
+      else
+	disp_y -= 1;
+    }
+    
+    if(keystate[SDLK_DOWN]){
+      if(MOVE / cellsidepx > 0)
+	disp_y += MOVE / cellsidepx;
+      else
+	disp_y += 1;
+    }
 
     while(SDL_PollEvent(&myevent)){
       switch(myevent.type){
@@ -253,11 +262,28 @@ int main(int argc, char **argv)
 	  if(gol_prompt("quit?"))
 	    state = gol_state_quit;
 	  break;
+	case SDLK_EQUALS:
+	  cellsidepx++;
+	  break;
+	case SDLK_MINUS:
+	  if(cellsidepx > 1)
+	    cellsidepx--;
+	  break;
 	case SDLK_p:
-	  state = gol_state_pause;
+	  if(state == gol_state_run)
+	    state = gol_state_pause;
+	  else if(state == gol_state_pause)
+	    state = gol_state_run;
 	  break;
 	case SDLK_r:
-	  state = gol_state_run;
+	  if(state == gol_state_pause && gol_prompt("reset?")){
+	    if(filename == NULL)
+	      for(i = 0; i < arrwidth * arrheight; i++) cur[i] = 0;
+	    else{
+	      load_gol(filename, cur);
+	    }
+	    generation = 0;
+	  }
 	  break;
 	case SDLK_n:
 	  if(state == gol_state_pause)
@@ -285,20 +311,8 @@ int main(int argc, char **argv)
 	  break;
 	case SDLK_l:
 	  if(state == gol_state_pause && gol_prompt("load saved.gol?")){
-	    file = fopen("saved.gol", "r");
-	    if(!file) puts("warning -- couldn't load saved.gol");
-	    else{
-	      for(c = 0; c < arrwidth * arrheight; c++) cur[c] = 0;
-	      generation = 0;
-	      while(fscanf(file, "%i %i\n", &fx, &fy) == 2){
-		if(fx < 0 || fx >= arrwidth || fy < 0 || fy >= arrheight){
-		  printf("warning -- you specified a point (%i, %i) outside the array, skipping it\n", fx, fy);
-		  continue;
-		}
-		cur[fx + fy * arrwidth] = 1;
-	      }
-	      fclose(file);
-	    }
+	    load_gol("saved.gol", cur);
+	    generation = 0;
 	  }
 	  break;
 	default:
@@ -307,14 +321,20 @@ int main(int argc, char **argv)
 	break;
       case SDL_MOUSEBUTTONDOWN:
 	if(state == gol_state_pause){
+	  click_x = myevent.button.x / cellsidepx + disp_x;
+	  while(click_x < 0) click_x += arrwidth;
+	  click_x = click_x % arrwidth;
+	  click_y = myevent.button.y / cellsidepx + disp_y;
+	  while(click_y < 0) click_y += arrheight;
+	  click_y = click_y % arrheight;
 	  switch(myevent.button.button){
-	  case SDL_BUTTON_LEFT:
-	    cur[myevent.button.x / cellsidepx + (myevent.button.y / cellsidepx) * arrwidth] = 1;
-	    sdl_display(cur, 0, 0, arrwidth, arrheight);
+	  case SDL_BUTTON_LEFT:	      
+	    cur[click_x + click_y * arrwidth] = 1;
+	    sdl_display(cur, disp_x, disp_y);
 	    break;
 	  case SDL_BUTTON_RIGHT:
-	    cur[myevent.button.x / cellsidepx + (myevent.button.y / cellsidepx) * arrwidth] = 0;
-	    sdl_display(cur, 0, 0, arrwidth, arrheight);
+	    cur[click_x + click_y * arrwidth] = 0;
+	    sdl_display(cur, disp_x, disp_y);
 	    break;
 	  }
 	}
@@ -332,7 +352,7 @@ int main(int argc, char **argv)
     }
 
     SDL_Flip(screen);
-
+    
     for(c = 0; c < arrwidth * arrheight; c++)
       count[c] = 0;
 
@@ -395,26 +415,65 @@ int main(int argc, char **argv)
   return 0;
 }
 
+int load_gol(char *filename, unsigned char *arr)
+{
+  int fx, fy, i;
+  FILE *file;
+
+  for(i = 0; i < arrwidth * arrheight; i++){
+    arr[i] = 0;
+  }
+
+  if(filename != NULL){
+    file = fopen(filename, "r");
+    if(file == NULL){
+      printf("error -- failed to open file %s\n", filename);
+      return 0;
+    }
+
+    while(fscanf(file, "%i %i\n", &fx, &fy) == 2){
+      fx += xoff;
+      fy += yoff;
+      if(fx < 0 || fx >= arrwidth || fy < 0 || fy >= arrheight){
+	printf("warning -- you specified a point (%i, %i) outside the array, skipping it\n", fx, fy);
+	continue;
+      }
+      arr[fx + fy * arrwidth] = 1;
+    }
+    
+    fclose(file);
+  }
+  return 1;
+}
 
 void sdl_display(unsigned char *arr,
-		 int xpos, int ypos,
-		 int width, int height)
+		 int xpos, int ypos)
 {
-  int i, j;
+  int i, j, yt;
   Uint8 *p;
   SDL_Rect dst;
+  //  int xt[arrwidth];
+  int xt[mainwindowwidth / cellsidepx];
   SDL_FillRect(screen, NULL, black);
 
+  for(i = 0; i < mainwindowwidth / cellsidepx; i++){
+    xt[i] = xpos + i;
+    while(xt[i] < 0) xt[i] += arrwidth;
+    xt[i] = xt[i] % arrwidth;
+  }
+  
   if(cellsidepx == 1){
-    //    puts("yo!");
     if(SDL_MUSTLOCK(screen))
       SDL_LockSurface(screen);
     
-    for(j = ypos; j < height; j++){
-      if(j >= arrheight) break;
-      for(i = xpos; i < width; i++){
-	if(i >= arrwidth) break;
-	else if(arr[i + j * arrwidth]){
+    for(j = 0; j < mainwindowheight / cellsidepx; j++){
+      yt = ypos + j;
+      while(yt < 0) yt += arrheight;
+      yt = yt % arrheight;
+
+      for(i = 0; i < mainwindowwidth / cellsidepx; i++){
+
+	if(arr[xt[i] + yt * arrwidth]){
 	  p = (Uint8 *)screen->pixels + j * screen->pitch + i * screen->format->BytesPerPixel;
 	  switch(screen->format->BytesPerPixel) {
 	  case 1:
@@ -444,11 +503,14 @@ void sdl_display(unsigned char *arr,
     if(SDL_MUSTLOCK(screen))
       SDL_UnlockSurface(screen);
   } else{ 
-    for(j = ypos; j < height; j++){
-      if(j >= arrheight) break;
-      for(i = xpos; i < width; i++){
-	if(i >= arrwidth) break;
-	else if(arr[i + j * arrwidth]){
+    for(j = 0; j < mainwindowheight / cellsidepx; j++){
+      yt = ypos + j;
+      while(yt < 0) yt += arrheight;
+      yt = yt % arrheight;
+
+      for(i = 0; i < mainwindowwidth / cellsidepx; i++){
+
+	if(arr[xt[i] + yt * arrwidth]){
 	  dst.x = i * cellsidepx;
 	  dst.y = j * cellsidepx;
 	  dst.w = cellsidepx;
@@ -460,7 +522,6 @@ void sdl_display(unsigned char *arr,
   }
   sprintf(strbuf, "generation %i", (int)generation);
   sprut_drawstring(strbuf, letters, screen, 5, mainwindowheight - 5 - LETTERHEIGHT);
-  //  SDL_Flip(screen);
 }
 
 void ascii_display(unsigned char *arr,
