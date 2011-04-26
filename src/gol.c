@@ -4,8 +4,8 @@
 #include "../include/sprut.h"
 #include "../include/sprutext.h"
 
-#define MAINWINDOWWIDTH 768
-#define MAINWINDOWHEIGHT 512
+#define MAINWINDOWWIDTH 1024
+#define MAINWINDOWHEIGHT 768
 
 /*
 #define ARRWIDTH 80
@@ -18,9 +18,9 @@
 #define WINDOW_G 100
 #define WINDOW_B 255
 
-#define CELLSIDEPX 8
+#define CELLSIDEPX 4
 
-#define WAIT 75
+#define WAIT 40
 #define MOVE 10
 
 #define LETTERS_SPRITEFILE "graphics/8letters.bmp"
