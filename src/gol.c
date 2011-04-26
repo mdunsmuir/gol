@@ -453,6 +453,7 @@ void sdl_display(unsigned char *arr,
 {
   int i, j, yt;
   Uint8 *p;
+  Uint32 *clr;
   SDL_Rect dst;
   //  int xt[arrwidth];
   int xt[mainwindowwidth / cellsidepx];
@@ -474,58 +475,40 @@ void sdl_display(unsigned char *arr,
       yt = yt % arrheight;
 
       for(i = 0; i < mainwindowwidth / cellsidepx; i++){
+	clr = NULL;
+	if(arr[xt[i] + yt * arrwidth])
+	  clr = &white;
+	else if(xt[i] == 0 || yt == 0)
+	  clr = &red;
 
-	if(arr[xt[i] + yt * arrwidth]){
+	if(clr){
 	  p = (Uint8 *)screen->pixels + j * screen->pitch + i * screen->format->BytesPerPixel;
 	  switch(screen->format->BytesPerPixel) {
 	  case 1:
-	    *p = white;
+	    *p = *clr;
 	    break;	    
 	  case 2:
-	    *(Uint16 *)p = white;
+	    *(Uint16 *)p = *clr;
 	    break;	    
 	  case 3:
 	    if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
-	      p[0] = (white >> 16) & 0xff;
-	      p[1] = (white >> 8) & 0xff;
-	      p[2] = white & 0xff;
+	      p[0] = (*clr >> 16) & 0xff;
+	      p[1] = (*clr >> 8) & 0xff;
+	      p[2] = *clr & 0xff;
 	    } else {
-	      p[0] = white & 0xff;
-	      p[1] = (white >> 8) & 0xff;
-	      p[2] = (white >> 16) & 0xff;
+	      p[0] = *clr & 0xff;
+	      p[1] = (*clr >> 8) & 0xff;
+	      p[2] = (*clr >> 16) & 0xff;
 	    }
 	    break;	    
 	  case 4:
-	    *(Uint32 *)p = white;
-	    break;
-	  }
-	} else if(xt[i] == 0 || yt == 0){
-	  p = (Uint8 *)screen->pixels + j * screen->pitch + i * screen->format->BytesPerPixel;
-	  switch(screen->format->BytesPerPixel) {
-	  case 1:
-	    *p = red;
-	    break;	    
-	  case 2:
-	    *(Uint16 *)p = red;
-	    break;	    
-	  case 3:
-	    if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
-	      p[0] = (red >> 16) & 0xff;
-	      p[1] = (red >> 8) & 0xff;
-	      p[2] = red & 0xff;
-	    } else {
-	      p[0] = red & 0xff;
-	      p[1] = (red >> 8) & 0xff;
-	      p[2] = (red >> 16) & 0xff;
-	    }
-	    break;	    
-	  case 4:
-	    *(Uint32 *)p = red;
+	    *(Uint32 *)p = *clr;
 	    break;
 	  }
 	}
       }
     }
+
     if(SDL_MUSTLOCK(screen))
       SDL_UnlockSurface(screen);
   } else{ 
@@ -535,19 +518,18 @@ void sdl_display(unsigned char *arr,
       yt = yt % arrheight;
 
       for(i = 0; i < mainwindowwidth / cellsidepx; i++){
+	clr = NULL;
+	if(arr[xt[i] + yt * arrwidth])
+	  clr = &white;
+	else if(xt[i] == 0 || yt == 0)
+	  clr = &red;
 
-	if(arr[xt[i] + yt * arrwidth]){
+	if(clr){
 	  dst.x = i * cellsidepx;
 	  dst.y = j * cellsidepx;
 	  dst.w = cellsidepx;
 	  dst.h = cellsidepx;
-	  SDL_FillRect(screen, &dst, white);
-	} else if(xt[i] == 0 || yt == 0){
-	  dst.x = i * cellsidepx;
-	  dst.y = j * cellsidepx;
-	  dst.w = cellsidepx;
-	  dst.h = cellsidepx;
-	  SDL_FillRect(screen, &dst, red);
+	  SDL_FillRect(screen, &dst, *clr);
 	}
       }
     }
